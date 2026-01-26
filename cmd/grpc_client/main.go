@@ -35,5 +35,9 @@ func main() {
 	}
 	log.Printf(color.RedString("User info:\n"), color.GreenString("%+v", r.GetUser()))
 
-
-}
+	l,err := c.List(ctx,&desc.ListRequest{Limit: 5})
+	if err != nil{
+		log.Fatalf("Failed to list users: %v",err)
+	}
+	log.Printf(color.RedString("User list:\n"), color.GreenString("%+v", l.GetUsers()))
+	}
