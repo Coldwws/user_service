@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	
 	"log"
 	"net"
-
 	"sync"
 
 	"user_service/internal/config"
@@ -26,7 +24,7 @@ var (
 	usersMu sync.Mutex
 )
 
-
+const grpcPort = 50051
 
 type server struct {
 	desc.UnimplementedUserV1Server
@@ -172,6 +170,8 @@ func main() {
 	_ = godotenv.Load("local.env")
 
 	cfg := config.LoadConfig()
+
+
 	lis, err := net.Listen("tcp", cfg.GRPC.Addr())
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
