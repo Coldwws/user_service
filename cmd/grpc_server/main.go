@@ -2,14 +2,17 @@ package main
 
 import (
 	"context"
-	"fmt"
+	
 	"log"
 	"net"
+
 	"sync"
 
+	"user_service/internal/config"
 	desc "user_service/pkg/user_v1"
 
 	"github.com/brianvoe/gofakeit"
+	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
@@ -23,7 +26,7 @@ var (
 	usersMu sync.Mutex
 )
 
-const grpcPort = 50051
+
 
 type server struct {
 	desc.UnimplementedUserV1Server
@@ -166,7 +169,10 @@ func (s *server) List(ctx context.Context, req *desc.ListRequest) (*desc.ListRes
 
 
 func main() {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
+	_ = godotenv.Load("local.env")
+
+	cfg := config.LoadConfig()
+	lis, err := net.Listen("tcp", cfg.GRPC.Addr())
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
