@@ -1,0 +1,14 @@
+FROM golang:1.20.3-alpine AS builder
+
+COPY . /user_service/grpc_course/source
+WORKDIR /user_service/grpc_course/source
+
+RUN go mod download
+RUN go build -o ./bin/crud_server cmd/grpc_server/main.go
+
+FROM alpine:latest
+
+WORKDIR /root/
+COPY --from=builder /user_service/grpc_course/source/bin/crud_server .
+
+CMD ["./crud_server"]
