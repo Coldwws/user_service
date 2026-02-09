@@ -13,11 +13,11 @@ type PGConfig struct {
 
 func loadPG() PGConfig {
 	return PGConfig{
-		Host:     getEnv("PG_HOST", "localhost"),
+		Host:     mustEnv("PG_HOST"),
 		Port:     getEnv("PG_PORT", "5432"),
-		DBName:   getEnv("PG_DATABASE_NAME", "user_service"),
-		User:     getEnv("PG_USER", "postgres"),
-		Password: getEnv("PG_PASSWORD", "postgres"),
+		DBName:   mustEnv("PG_DATABASE_NAME"),
+		User:     mustEnv("PG_USER"),
+		Password: mustEnv("PG_PASSWORD"),
 		SSLMode:  getEnv("PG_SSLMODE", "disable"),
 	}
 }
