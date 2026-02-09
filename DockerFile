@@ -1,4 +1,4 @@
-FROM golang:1.20.3-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 COPY . /user_service/grpc_course/source
 WORKDIR /user_service/grpc_course/source
