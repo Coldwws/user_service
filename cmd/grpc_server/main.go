@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"net"
-	"sync"
-
+	"os"
 	"user_service/internal/config"
 	desc "user_service/pkg/user_v1"
 
-	"github.com/brianvoe/gofakeit"
+	sq "github.com/Masterminds/squirrel"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -19,71 +20,15 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-var (
-	users   = make(map[int64]*desc.User)
-	usersMu sync.Mutex
-)
-
-const grpcPort = 50051
 
 type server struct {
+	db *pgxpool.Pool
 	desc.UnimplementedUserV1Server
 }
 
-func (s *server)Delete(ctx context.Context, req *desc.DeleteRequest)(*emptypb.Empty, error){
-	log.Printf("Delete User")
-
-	usersMu.Lock()
-	defer usersMu.Unlock()
-
-	if _, ok := users[req.GetId()]; !ok{
-		return nil, status.Error(codes.NotFound, "user not found")
-	}
-
-	delete(users,req.Id)
-	return &emptypb.Empty{}, nil
-}
-
-
-func (s *server) Update(ctx context.Context, req *desc.UpdateRequest) (*emptypb.Empty, error) {
-	log.Printf("Update User")
 
 
 
-	if req.Info == nil{
-		return nil, status.Error(codes.InvalidArgument,"update info is required")
-	}
-
-	usersMu.Lock()
-	defer usersMu.Unlock()
-
-	user,ok := users[req.GetId()]
-	if !ok {
-		return nil, status.Error(codes.NotFound, "user not found")
-	}
-	
-	info := req.Info
-
-	if info.GetFirstName() != nil {
-		user.Info.FirstName = info.GetFirstName().GetValue()
-	}
-	if info.GetLastName() != nil {
-		user.Info.LastName = info.GetLastName().GetValue()
-	}
-	if info.GetPassword() != nil {
-		user.Info.Password = info.GetPassword().GetValue()
-	}
-	if info.GetPhoneNumber() != nil {
-		user.Info.PhoneNumber = info.GetPhoneNumber().GetValue()
-	}
-	if info.GetEmail() != nil {
-		user.Info.Email = info.GetEmail().GetValue()
-	}
-	user.UpdatedAt = timestamppb.Now()
-
-	return &emptypb.Empty{}, nil
-
-}
 
 func (s *server) Create(ctx context.Context, req *desc.CreateRequest) (*desc.CreateResponse, error) {
 	log.Printf("Create User")
@@ -101,75 +46,195 @@ func (s *server) Create(ctx context.Context, req *desc.CreateRequest) (*desc.Cre
 		return nil, status.Error(codes.InvalidArgument, "Password is required")
 	}
 
-	usersMu.Lock()
-	defer usersMu.Unlock()
+	qb := sq.Insert("users").
+	PlaceholderFormat(sq.Dollar).
+	Columns("first_name","last_name","phone_number","email","password").
+	Values(info.GetFirstName(),info.GetLastName(),info.GetPhoneNumber(),info.GetEmail(),info.GetPassword()).Suffix("RETURNING id")
 
-	userID := int64(gofakeit.Uint32())
-	now := timestamppb.Now()
-
-	user := &desc.User{
-		Id:        userID,
-		Info:      info,
-		CreatedAt: now,
-		UpdatedAt: now,
+	query,args,err := qb.ToSql()
+	if err != nil{
+		log.Fatalf("Failed to build query: %v",err)
+	}
+	var userID int
+	err = s.db.QueryRow(ctx,query,args...).Scan(&userID)
+	if err != nil{
+		log.Fatalf("Failed to execute query: %v", err)
 	}
 
-	users[userID] = user
-
-	return &desc.CreateResponse{
-		Id: userID,
-	}, nil
-
+	log.Printf("Created user with ID: %d", userID)
+	return &desc.CreateResponse{Id: int64(userID)},nil
 }
 
-func (s *server) Get(ctx context.Context, req *desc.GetRequest) (*desc.GetResponse, error) {
+func(s *server) Update(ctx context.Context, req *desc.UpdateRequest)(*emptypb.Empty,error){
+	log.Printf("Update User")
+
+	info := req.GetInfo()
+
+	if info == nil{
+		return nil, status.Error(codes.InvalidArgument, "info is required")
+	}
+	qb := sq.Update("users").
+	PlaceholderFormat(sq.Dollar).
+	Where(sq.Eq{"id":req.GetId()})
+
+	changed := false
+
+	if v := info.GetFirstName(); v != nil{
+		qb = qb.Set("first_name",v.GetValue());changed=true
+	}
+	if v := info.GetLastName(); v!= nil{
+		qb = qb.Set("last_name",v.GetValue()); changed=true
+	}
+	if v:= info.GetPhoneNumber(); v!= nil{
+		qb = qb.Set("phone_number",v.GetValue());changed=true
+	}
+	if v := info.GetEmail(); v!= nil{
+		qb = qb.Set("email",v.GetValue()); changed=true
+	}
+	if v := info.GetPassword(); v!=nil{
+		qb =qb.Set("password", v.GetValue());changed= true
+	}
+
+	if !changed{
+		return &emptypb.Empty{},nil
+	}
+
+	qb = qb.Set("updated_at",sq.Expr("now()"))
+
+	query,args,err := qb.ToSql()
+	if err != nil{
+		return nil, status.Error(codes.Internal,"Failed to execute query")
+	}
+	ct,err := s.db.Exec(ctx,query,args...)
+	if err != nil{
+		return nil, status.Error(codes.Internal,"Failed to execute query")
+	}
+	if ct.RowsAffected() == 0{
+		return nil, status.Error(codes.NotFound,"User not found")
+	}
+
+	log.Printf("User with id:%d updated",req.GetId())
+	return &emptypb.Empty{},nil
+}
+
+func(s *server) Delete(ctx context.Context,req *desc.DeleteRequest)(*emptypb.Empty,error){
+	log.Printf("Delete User")
+
+	qb := sq.Delete("users").
+	PlaceholderFormat(sq.Dollar).
+	Where(sq.Eq{"id":req.GetId()})
+
+	query,args,err := qb.ToSql()
+	if err != nil{
+		return nil, status.Error(codes.Internal,"Failed to build query")
+
+	}
+
+	ct,err := s.db.Exec(ctx,query,args...)
+	if err != nil{
+		return nil, status.Error(codes.Internal,"Failed to execute query")
+	}
+	if ct.RowsAffected() == 0{
+		return nil, status.Error(codes.NotFound,"User not found")
+	}
+	log.Printf("User with id:%d deleted",req.GetId())
+	return &emptypb.Empty{},nil
+}
+
+func (s *server)List(ctx context.Context, req *desc.ListRequest)(*desc.ListResponse,error){
+	log.Printf("Users List")
+	limit := uint64(req.GetLimit())
+	if limit == 0{
+		limit = 10
+	}
+	offset := uint64(req.GetOffset())
+
+	qb := sq.Select("id","first_name","last_name","email","phone_number","created_at","updated_at").
+	From("users").
+	PlaceholderFormat(sq.Dollar).
+	OrderBy("id ASC").
+	Limit(limit).
+	Offset(offset)
+
+	query,args,err := qb.ToSql()
+	if err != nil{
+		log.Fatalf("Failed to build query: %v",err)
+	}
+
+	rows,err := s.db.Query(ctx,query,args...)
+	if err != nil{
+		log.Fatalf("Failed to execute query :%v",err)
+	}
+	defer rows.Close()
+	users := make([]*desc.User,0,limit)
+	for rows.Next(){
+		u := &desc.User{Info: &desc.UserInfo{}}
+		var createdAt,updatedAt sql.NullTime
+
+		err := rows.Scan(&u.Id,&u.Info.FirstName,&u.Info.LastName,&u.Info.Email,&u.Info.PhoneNumber,&createdAt,&updatedAt)
+		if err != nil{
+			return nil,err
+		}
+		if createdAt.Valid{
+			u.CreatedAt = timestamppb.New(createdAt.Time)
+		}
+		if updatedAt.Valid {
+			u.UpdatedAt = timestamppb.New(updatedAt.Time)
+		}
+		users = append(users,u)
+	}
+
+	return &desc.ListResponse{Users: users},nil
+} 
+
+func (s *server) Get(ctx context.Context, req *desc.GetRequest)(*desc.GetResponse,error){
 	log.Printf("User id: %d", req.GetId())
 
-	usersMu.Lock()
-	defer usersMu.Unlock()
+	qb := sq.Select("id","first_name","last_name","email","phone_number","created_at","updated_at").
+	From("users").
+	Where(sq.Eq{"id":req.GetId()}).
+	PlaceholderFormat(sq.Dollar)
 
-	user, ok := users[req.GetId()]
+	query,args,err := qb.ToSql()
+	if err != nil{
+		log.Fatalf("Failed to build query: %v",err)
+	}
+	user := desc.User{
+		Info: &desc.UserInfo{
+		},
+	}
+	var createdAt,updatedAt sql.NullTime
 
-	if !ok {
-		return nil, status.Error(codes.NotFound, "user not found")
+	err = s.db.QueryRow(ctx,query,args...).Scan(&user.Id,&user.Info.FirstName,&user.Info.LastName,&user.Info.Email,&user.Info.PhoneNumber,&createdAt,&updatedAt)
+	if err != nil{
+		log.Fatalf("Failed to execute query:%v",err)
 	}
 
-	return &desc.GetResponse{
-		User: user,
-	}, nil
-
-}
-
-func (s *server) List(ctx context.Context, req *desc.ListRequest) (*desc.ListResponse, error) {
-	log.Printf("List users")
-
-	usersMu.Lock()
-	defer usersMu.Unlock()
-
-	limit := int(req.GetLimit())
-	offset := int(req.GetOffset())
-
-	var list []*desc.User
-	i := 0
-
-	
-	for _, user := range users {
-		if i >= offset && len(list) < limit {
-			list = append(list, user)
-		}
-		i++
+	if createdAt.Valid{
+		user.CreatedAt = timestamppb.New(createdAt.Time)
 	}
-
-	return &desc.ListResponse{
-		Users: list,
-	}, nil
+	if updatedAt.Valid{
+		user.UpdatedAt = timestamppb.New(updatedAt.Time)
+	}
+	return &desc.GetResponse{User: &user},nil
 }
 
 
 func main() {
-	_ = godotenv.Load("local.env")
+	if f:= os.Getenv("ENV_FILE"); f!= ""{
+		_ = godotenv.Load(f)
+	}
 
 	cfg := config.LoadConfig()
+
+	ctx := context.Background()
+
+	poll,err := pgxpool.Connect(ctx,cfg.PG.DSN())
+	if err != nil{
+		log.Fatalf("Failed to connect database: %v", err)
+	}
+	defer poll.Close()
+	log.Println("Connected to Postgres")
 
 
 	lis, err := net.Listen("tcp", cfg.GRPC.Addr())
@@ -179,7 +244,9 @@ func main() {
 
 	s := grpc.NewServer()
 	reflection.Register(s)
-	desc.RegisterUserV1Server(s, &server{})
+
+	srv := &server{db:poll}
+	desc.RegisterUserV1Server(s, srv)
 
 	log.Printf("server listening at %v", lis.Addr())
 

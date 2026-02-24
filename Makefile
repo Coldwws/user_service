@@ -28,3 +28,9 @@ build:
 
 copy-to-server:
 	scp service_linux @root:
+
+run-local:
+	ENV_FILE=local.env go run ./cmd/grpc_server
+
+run-prod:
+	ENV_FILE=prod.env go run ./cmd/grpc_server
