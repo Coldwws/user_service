@@ -51,7 +51,7 @@ message GetRequest {
 }
 
 message GetResponse {
-    User user = 1;    
+    User user = 1;  
 }
 
 message ListRequest {
