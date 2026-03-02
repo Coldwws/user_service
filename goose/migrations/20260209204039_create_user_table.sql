@@ -1,12 +1,12 @@
 -- +goose Up
 CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
-    first_name TEXT,
-    last_name TEXT,
-    password TEXT,
-    phone_number TEXT,
-    email TEXT,
-    created_at TIMESTAMPTZ,
+    first_name TEXT not null,
+    last_name TEXT not null,
+    password TEXT not null,
+    phone_number TEXT not null,
+    email TEXT not null,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ
 );
 -- +goose StatementBegin
