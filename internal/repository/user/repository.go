@@ -1,10 +1,14 @@
 package user
+
 import (
-	"github.com/jackc/pgx/v4/pgxpool"
-	"user_service/internal/repository"
 	"context"
+	"time"
+	"user_service/internal/model"
+	"user_service/internal/repository"
+
 	sq "github.com/Masterminds/squirrel"
-	"user_service/internal/repository/user/model"
+	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 )
 
 type repo struct{
@@ -18,8 +22,8 @@ func NewRepository(db *pgxpool.Pool) repository.UserRepository{
 func (r *repo)Create(ctx context.Context, user *model.User)(int64,error){
 	qb := sq.Insert("users").
 	PlaceholderFormat(sq.Dollar).
-	Columns("first_name","last_name","phone_number","email","password").
-	Values(user.FirstName,user.LastName,user.Phone,user.Email,user.Password).Suffix("RETURNING id")
+	Columns("first_name","last_name","phone_number","email","password","created_at").
+	Values(user.FirstName,user.LastName,user.Phone,user.Email,user.Password,time.Now()).Suffix("RETURNING id")
 
 
 	query,args,err := qb.ToSql()
@@ -63,8 +67,101 @@ func (r *repo)	Get(ctx context.Context, id int64)(*model.User,error){
 	return &user,nil
 }
 
-// func	(r *repo)	List(ctx context.Context, limit int64, offset int64)([]*model.User,error){}
+func	(r *repo)	List(ctx context.Context, limit int64, offset int64)([]*model.User,error){
+	qb := sq.Select("id","first_name","last_name","email","phone_number","created_at","updated_at").
+	From("users").PlaceholderFormat(sq.Dollar).OrderBy("id").Limit(uint64(limit)).Offset(uint64(offset))
 
-// func	(r *repo)	Update(ctx context.Context, id int64, info *model.User)(error){}
+	query,args,err := qb.ToSql()
+	if err != nil{
+		return nil,err
+	}
 
-// func	(r *repo)	Delete(ctx context.Context, id int64)(error){}
+	rows,err := r.db.Query(ctx,query,args...)
+	if err != nil{
+		return nil,err
+	}
+	defer rows.Close()
+
+	var users []*model.User
+
+	for rows.Next(){
+		var user model.User
+			err = rows.Scan(
+				&user.ID,
+				&user.FirstName,
+				&user.LastName,
+				&user.Email,
+				&user.Phone,
+				&user.CreatedAt,
+				&user.UpdatedAt,
+			)
+			if err != nil{
+				return nil,err
+			}
+			users = append(users, &user)
+		}
+		return users,nil
+}
+
+func	(r *repo)	Update(ctx context.Context, id int64, updateUser *model.User)(error){
+	qb := sq.Update("users").
+        PlaceholderFormat(sq.Dollar).
+        Where(sq.Eq{"id": id})
+
+    
+    if updateUser.FirstName != "" {
+        qb = qb.Set("first_name", updateUser.FirstName)
+    }
+    if updateUser.LastName != "" {
+        qb = qb.Set("last_name", updateUser.LastName)
+    }
+    if updateUser.Email != "" {
+        qb = qb.Set("email", updateUser.Email)
+    }
+    if updateUser.Phone != "" {
+        qb = qb.Set("phone_number", updateUser.Phone)
+    }
+    if updateUser.Password != "" {
+        qb = qb.Set("password", updateUser.Password)
+    }
+
+    
+    qb = qb.Set("updated_at", updateUser.UpdatedAt.Time)
+
+    query, args, err := qb.ToSql()
+    if err != nil {
+        return err
+    }
+
+    res, err := r.db.Exec(ctx, query, args...)
+    if err != nil {
+        return err
+    }
+
+    if res.RowsAffected() == 0 {
+        return pgx.ErrNoRows
+    }
+
+    return nil
+}
+
+
+func	(r *repo)	Delete(ctx context.Context, id int64)(error){
+	qb := sq.Delete("users").Where(sq.Eq{"id":id}).PlaceholderFormat(sq.Dollar)
+
+	query,args,err := qb.ToSql()
+	if err != nil{
+		return err
+	}
+
+	del,err := r.db.Exec(ctx,query,args...)
+	if err != nil{
+		return err
+	}
+
+	if del.RowsAffected()==0{
+		return pgx.ErrNoRows
+	}
+
+	return nil
+}
