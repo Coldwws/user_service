@@ -4,14 +4,14 @@ import (
 	"user_service/internal/service"
 	desc "user_service/pkg/user_v1"
 )
-type server struct{
+type Server struct{
 	userService service.UserService
 	desc.UnimplementedUserV1Server
 }
 
 
-func NewServer(userService service.UserService)*server{
-	return &server{
+func NewServer(userService service.UserService) *Server{
+	return &Server{
 		userService: userService,
 	}
 }

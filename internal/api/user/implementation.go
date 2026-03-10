@@ -10,7 +10,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-func (s *server) Create(ctx context.Context, req *desc.CreateRequest) (*desc.CreateResponse, error) {
+func (s *Server) Create(ctx context.Context, req *desc.CreateRequest) (*desc.CreateResponse, error) {
 	userModel := converter.UserProtoToModel(&desc.User{
 		Info: &desc.UserInfo{
 			FirstName:   req.Info.FirstName,
@@ -27,7 +27,7 @@ func (s *server) Create(ctx context.Context, req *desc.CreateRequest) (*desc.Cre
 	}
 	return &desc.CreateResponse{Id: id}, nil
 }
-func (s *server) Get(ctx context.Context, req *desc.GetRequest) (*desc.GetResponse, error) {
+func (s *Server) Get(ctx context.Context, req *desc.GetRequest) (*desc.GetResponse, error) {
 	userModel, err := s.userService.Get(ctx, req.Id)
 	if err != nil {
 		return nil, err
@@ -38,7 +38,7 @@ func (s *server) Get(ctx context.Context, req *desc.GetRequest) (*desc.GetRespon
 	}, nil
 }
 
-func (s *server) Delete(ctx context.Context, req *desc.DeleteRequest) (*emptypb.Empty, error) {
+func (s *Server) Delete(ctx context.Context, req *desc.DeleteRequest) (*emptypb.Empty, error) {
 	del := s.userService.Delete(ctx, req.Id)
 	if del != nil {
 		return nil, del
@@ -46,7 +46,7 @@ func (s *server) Delete(ctx context.Context, req *desc.DeleteRequest) (*emptypb.
 	return &emptypb.Empty{}, nil
 }
 
-func (s *server)List(ctx context.Context, req *desc.ListRequest)(*desc.ListResponse,error){
+func (s *Server)List(ctx context.Context, req *desc.ListRequest)(*desc.ListResponse,error){
 	userList, err := s.userService.List(ctx,req.Limit,req.Offset)
 	if err != nil{
 		 return &desc.ListResponse{}, err
@@ -61,7 +61,7 @@ func (s *server)List(ctx context.Context, req *desc.ListRequest)(*desc.ListRespo
 	},nil
 }
 
-func (s *server)Update(ctx context.Context, req *desc.UpdateRequest)(*emptypb.Empty,error){
+func (s *Server)Update(ctx context.Context, req *desc.UpdateRequest)(*emptypb.Empty,error){
     userModel := &model.User{
         ID:        req.Id,
 				UpdatedAt: sql.NullTime{Time: time.Now(),Valid: true},

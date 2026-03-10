@@ -11,7 +11,7 @@ type Config struct{
 	PG PGConfig
 }
 
-func LoadConfig()Config{
+func LoadConfig() Config{
 	return Config{
 		Env: getEnv("ENV","local"),
 		GRPC: loadGRPC(),
