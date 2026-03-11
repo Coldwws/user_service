@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	apiUser "user_service/internal/api/user"
+	"user_service/internal/client/db/pg"
 	"user_service/internal/closer"
 	"user_service/internal/config"
 	"user_service/internal/repository"
@@ -67,7 +68,11 @@ func(s *serviceProvider)PGPool() *pgxpool.Pool{
 
 func(s *serviceProvider)UserRepository() repository.UserRepository{
 	if s.userRepository == nil{
-		s.userRepository = userRepo.NewRepository(s.PGPool())
+		pgClient,err := pg.New(ctx,s.config.PG.DSN())
+		if err != nil{
+			log.Fatalf("Failed to init pg client %v", err)
+		}
+		s.userRepository = userRepo.NewRepository(pgClient)
 	}
 	return s.userRepository
 }

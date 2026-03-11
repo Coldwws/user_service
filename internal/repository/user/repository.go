@@ -3,19 +3,20 @@ package user
 import (
 	"context"
 	"time"
+	"user_service/internal/client/db"
 	"user_service/internal/model"
 	"user_service/internal/repository"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	
 )
 
 type repo struct{
-	db *pgxpool.Pool
+	db db.Client
 }
 
-func NewRepository(db *pgxpool.Pool) repository.UserRepository{
+func NewRepository(db db.Client) repository.UserRepository{
 	return &repo{db: db}
 }
 
@@ -29,9 +30,14 @@ func (r *repo)Create(ctx context.Context, user *model.User)(int64,error){
 	query,args,err := qb.ToSql()
 	if err != nil { return 0,err}
 
+	q := db.Query{
+		Name: "user_repository.Create",
+		QueryRaw: query,
+	}
+
 	var userID int64
 
-	err = r.db.QueryRow(ctx,query,args...).Scan(&userID)
+	err = r.db.DB().QueryRowContext(ctx,q,args...).Scan(&userID)
 	if err !=nil{return 0,err}
 
 	return userID,nil
@@ -48,18 +54,14 @@ func (r *repo)	Get(ctx context.Context, id int64)(*model.User,error){
 	if err != nil{
 		return nil,err
 	}
+	q := db.Query{
+		Name: "user_repository.Get",
+		QueryRaw: query,
+	}
 
 	var user model.User
 
-	err = r.db.QueryRow(ctx, query, args...).Scan(
-		&user.ID,
-		&user.FirstName,
-		&user.LastName,
-		&user.Email,
-		&user.Phone,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
+	err = r.db.DB().ScanOneContext(ctx, &user, q, args...)
 	if err != nil{
 		return nil,err
 	}
@@ -69,37 +71,27 @@ func (r *repo)	Get(ctx context.Context, id int64)(*model.User,error){
 
 func	(r *repo)	List(ctx context.Context, limit int64, offset int64)([]*model.User,error){
 	qb := sq.Select("id","first_name","last_name","email","phone_number","created_at","updated_at").
-	From("users").PlaceholderFormat(sq.Dollar).OrderBy("id").Limit(uint64(limit)).Offset(uint64(offset))
+	From("users").
+	PlaceholderFormat(sq.Dollar).
+	OrderBy("id").
+	Limit(uint64(limit)).
+	Offset(uint64(offset))
 
 	query,args,err := qb.ToSql()
 	if err != nil{
 		return nil,err
 	}
+	q := db.Query{
+		Name: "user_repository.List",
+		QueryRaw: query,
+	}
+	var users []*model.User
 
-	rows,err := r.db.Query(ctx,query,args...)
+	err = r.db.DB().ScanAllContext(ctx,&users,q,args...)
+
 	if err != nil{
 		return nil,err
 	}
-	defer rows.Close()
-
-	var users []*model.User
-
-	for rows.Next(){
-		var user model.User
-			err = rows.Scan(
-				&user.ID,
-				&user.FirstName,
-				&user.LastName,
-				&user.Email,
-				&user.Phone,
-				&user.CreatedAt,
-				&user.UpdatedAt,
-			)
-			if err != nil{
-				return nil,err
-			}
-			users = append(users, &user)
-		}
 		return users,nil
 }
 
@@ -133,7 +125,12 @@ func	(r *repo)	Update(ctx context.Context, id int64, updateUser *model.User)(err
         return err
     }
 
-    res, err := r.db.Exec(ctx, query, args...)
+		q := db.Query{
+			Name: "user_repository.Update",
+			QueryRaw: query,
+		}
+
+    res, err := r.db.DB().ExecContext(ctx, q, args...)
     if err != nil {
         return err
     }
@@ -154,7 +151,11 @@ func	(r *repo)	Delete(ctx context.Context, id int64)(error){
 		return err
 	}
 
-	del,err := r.db.Exec(ctx,query,args...)
+	q := db.Query{
+		Name: "user_repository.Delete",
+		QueryRaw: query,
+	}
+	del,err := r.db.DB().ExecContext(ctx,q,args...)
 	if err != nil{
 		return err
 	}

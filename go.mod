@@ -32,6 +32,8 @@ require (
 require (
 	github.com/brianvoe/gofakeit v3.18.0+incompatible
 	github.com/fatih/color v1.18.0
+	github.com/georgysavva/scany v1.2.3
+	github.com/pkg/errors v0.9.1
 	go.opentelemetry.io/otel v1.34.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.34.0 // indirect
 	golang.org/x/net v0.38.0 // indirect
