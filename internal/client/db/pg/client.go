@@ -1,10 +1,12 @@
 package pg
 
 import (
-	"user_service/internal/client/db"
 	"context"
-	"github.com/pkg/errors"
+	"user_service/internal/client/db"
+
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/pkg/errors"
 )
 
 type pgClient struct{
@@ -25,6 +27,12 @@ func New(ctx context.Context, dsn string) (db.Client,error){
 func(c *pgClient)DB() db.DB{
 	return c.masterDBC
 }
+
+func MakeContextTx(ctx context.Context, tx pgx.Tx)context.Context{
+	return context.WithValue(ctx,TxKey,tx)
+}
+
+
 
 func (c *pgClient)Close()error{
 	if c.masterDBC != nil{
