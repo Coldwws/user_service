@@ -12,6 +12,10 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 
 )
+type key string
+
+const TxKey key = "tx"
+
 
 type pg struct{
 	dbc *pgxpool.Pool
@@ -19,6 +23,10 @@ type pg struct{
 
 func NewDB(dbc *pgxpool.Pool) *pg{
 	return &pg{dbc:dbc}
+}
+
+func (p *pg) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error) {
+	return p.dbc.BeginTx(ctx, txOptions)
 }
 
 func(p *pg)ScanOneContext(ctx context.Context,dest interface{}, q db.Query, args ...interface{}) error{
@@ -47,17 +55,28 @@ func(p *pg)ScanAllContext(ctx context.Context,dest interface{}, q db.Query, args
 func(p *pg)ExecContext(ctx context.Context, q db.Query, args ...interface{})(pgconn.CommandTag, error){
 	logQuery(ctx,q,args...)
 
+	if tx,ok := ctx.Value(TxKey).(pgx.Tx); ok{
+		return tx.Exec(ctx,q.QueryRaw, args...)
+	}
+	
 	return p.dbc.Exec(ctx, q.QueryRaw, args...)
 }
 
 func(p *pg)QueryContext(ctx context.Context, q db.Query, args ...interface{})(pgx.Rows,error){
 	logQuery(ctx,q,args...)
 
+	if tx,ok:= ctx.Value(TxKey).(pgx.Tx); ok{
+		return tx.Query(ctx,q.QueryRaw, args...)
+	}
 	return p.dbc.Query(ctx, q.QueryRaw, args...)
 }
 
 func(p *pg)QueryRowContext(ctx context.Context, q db.Query, args ...interface{})pgx.Row{
 	logQuery(ctx,q,args...)
+
+	if tx,ok := ctx.Value(TxKey).(pgx.Tx); ok{
+		return tx.QueryRow(ctx,q.QueryRaw, args...)
+	}
 
 	return p.dbc.QueryRow(ctx, q.QueryRaw, args...)
 }

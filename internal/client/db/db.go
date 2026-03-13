@@ -21,6 +21,17 @@ type Query struct{
 	QueryRaw string // squrrel выплюнет сырой запрос 
 }
 
+type Transactor interface{
+	BeginTx(ctx context.Context, txOptions pgx.TxOptions)(pgx.Tx, error)
+}
+
+type Handler func (ctx context.Context)error
+
+type TxManager interface{
+	ReadCommitted(ctx context.Context, f Handler)error
+}
+
+
 type SQLExecer interface{
  NamedExecer
  QueryExecer
@@ -48,5 +59,6 @@ type Pinger interface{
 type DB interface{
 	SQLExecer
 	Pinger
+	Transactor
 	Close()
 }
