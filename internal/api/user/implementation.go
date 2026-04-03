@@ -3,11 +3,11 @@ package user
 import (
 	"context"
 	"database/sql"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"time"
 	"user_service/internal/converter"
 	"user_service/internal/model"
 	desc "user_service/pkg/user_v1"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func (s *Server) Create(ctx context.Context, req *desc.CreateRequest) (*desc.CreateResponse, error) {
@@ -46,47 +46,47 @@ func (s *Server) Delete(ctx context.Context, req *desc.DeleteRequest) (*emptypb.
 	return &emptypb.Empty{}, nil
 }
 
-func (s *Server)List(ctx context.Context, req *desc.ListRequest)(*desc.ListResponse,error){
-	userList, err := s.userService.List(ctx,req.Limit,req.Offset)
-	if err != nil{
-		 return &desc.ListResponse{}, err
+func (s *Server) List(ctx context.Context, req *desc.ListRequest) (*desc.ListResponse, error) {
+	userList, err := s.userService.List(ctx, req.Limit, req.Offset)
+	if err != nil {
+		return &desc.ListResponse{}, err
 	}
-	protoUsers := make([]*desc.User,0,len(userList))
-	for _,u := range userList{
-		protoUsers = append(protoUsers,converter.UserModelToProto(u))
+	protoUsers := make([]*desc.User, 0, len(userList))
+	for _, u := range userList {
+		protoUsers = append(protoUsers, converter.UserModelToProto(u))
 	}
 
 	return &desc.ListResponse{
 		Users: protoUsers,
-	},nil
+	}, nil
 }
 
-func (s *Server)Update(ctx context.Context, req *desc.UpdateRequest)(*emptypb.Empty,error){
-    userModel := &model.User{
-        ID:        req.Id,
-				UpdatedAt: sql.NullTime{Time: time.Now(),Valid: true},
-    }
+func (s *Server) Update(ctx context.Context, req *desc.UpdateRequest) (*emptypb.Empty, error) {
+	userModel := &model.User{
+		ID:        req.Id,
+		UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+	}
 
-		    if req.Info.FirstName != nil {
-        userModel.FirstName = req.Info.FirstName.GetValue()
-    }
-    if req.Info.LastName != nil {
-        userModel.LastName = req.Info.LastName.GetValue()
-    }
-    if req.Info.Email != nil {
-        userModel.Email = req.Info.Email.GetValue()
-    }
-    if req.Info.PhoneNumber != nil {
-        userModel.Phone = req.Info.PhoneNumber.GetValue()
-    }
-    if req.Info.Password != nil {
-        userModel.Password = req.Info.Password.GetValue()
-    }
-		
-    err := s.userService.Update(ctx, req.Id, userModel)
-    if err != nil {
-        return nil, err
-    }
+	if req.Info.FirstName != nil {
+		userModel.FirstName = req.Info.FirstName.GetValue()
+	}
+	if req.Info.LastName != nil {
+		userModel.LastName = req.Info.LastName.GetValue()
+	}
+	if req.Info.Email != nil {
+		userModel.Email = req.Info.Email.GetValue()
+	}
+	if req.Info.PhoneNumber != nil {
+		userModel.Phone = req.Info.PhoneNumber.GetValue()
+	}
+	if req.Info.Password != nil {
+		userModel.Password = req.Info.Password.GetValue()
+	}
 
-    return &emptypb.Empty{}, nil
+	err := s.userService.Update(ctx, req.Id, userModel)
+	if err != nil {
+		return nil, err
+	}
+
+	return &emptypb.Empty{}, nil
 }

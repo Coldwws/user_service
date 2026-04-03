@@ -34,3 +34,6 @@ run-local:
 
 run-prod:
 	ENV_FILE=prod.env go run ./cmd/grpc_server
+
+install-minimock:
+	GOBIN=$(LOCAL_BIN) go install github.com/gojuno/minimock/v3/cmd/minimock@latest
