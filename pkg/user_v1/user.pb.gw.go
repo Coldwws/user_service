@@ -2,7 +2,7 @@
 // source: user.proto
 
 /*
-Package  user_v1 is a reverse proxy.
+Package user_v1 is a reverse proxy.
 
 It translates gRPC into RESTful JSON APIs.
 */

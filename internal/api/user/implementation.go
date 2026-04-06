@@ -11,6 +11,7 @@ import (
 )
 
 func (s *Server) Create(ctx context.Context, req *desc.CreateRequest) (*desc.CreateResponse, error) {
+
 	userModel := converter.UserProtoToModel(&desc.User{
 		Info: &desc.UserInfo{
 			FirstName:   req.Info.FirstName,
@@ -19,6 +20,7 @@ func (s *Server) Create(ctx context.Context, req *desc.CreateRequest) (*desc.Cre
 			Email:       req.Info.Email,
 		},
 	})
+
 	userModel.Password = req.Info.Password
 
 	id, err := s.userService.Create(ctx, userModel)
