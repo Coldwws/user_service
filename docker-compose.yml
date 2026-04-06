@@ -38,3 +38,4 @@ services:
       - migrator
     ports:
       - "50051:50051"
+      - "8081:8081"
