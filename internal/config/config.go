@@ -6,10 +6,11 @@ import (
 )
 
 type Config struct {
-	Env  string
-	GRPC GRPCConfig
-	PG   PGConfig
-	Http HttpConfig
+	Env     string
+	GRPC    GRPCConfig
+	PG      PGConfig
+	Http    HttpConfig
+	Swagger SwaggerConfig
 }
 
 func LoadConfig() Config {
@@ -18,11 +19,17 @@ func LoadConfig() Config {
 		log.Fatalf("failed to load HTTP config: %v", err)
 	}
 
+	swaggerConf, err := NewSwaggerConfig()
+	if err != nil {
+		log.Fatalf("failed to load Swagger config: %v", err)
+	}
+
 	return Config{
-		Env:  getEnv("ENV", "local"),
-		GRPC: loadGRPC(),
-		PG:   loadPG(),
-		Http: httpConf,
+		Env:     getEnv("ENV", "local"),
+		GRPC:    loadGRPC(),
+		PG:      loadPG(),
+		Http:    httpConf,
+		Swagger: swaggerConf,
 	}
 }
 

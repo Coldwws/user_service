@@ -7,9 +7,25 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 import "google/api/annotations.proto";
 import "validate/validate.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "user-service/pkg/user_v1;user_v1";
 
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+    info: {
+        title: "User API"
+        version: "1.0.0"
+        contact: {
+            name: "Edil Token"
+            email: "edilSenior@halyk.kz"
+        };
+    };
+    host: "localhost:8081",
+    schemes: HTTP,
+    schemes: HTTPS,
+    consumes: "application/json",
+    produces: "application/json",
+};
 
 service UserV1{
     rpc Create (CreateRequest) returns (CreateResponse){
@@ -21,7 +37,7 @@ service UserV1{
 
     rpc Get (GetRequest) returns (GetResponse){
         option(google.api.http) = {
-            get:"/user/v1"
+            get:"/user/v1/{id}"
         };
     }
     rpc List (ListRequest) returns (ListResponse){
@@ -32,14 +48,13 @@ service UserV1{
 
     rpc Update (UpdateRequest) returns (google.protobuf.Empty){
         option(google.api.http) = {
-            patch: "/user/v1"
+            patch: "/user/v1/{id}"
             body: "*"
         };
     }
     rpc Delete (DeleteRequest) returns (google.protobuf.Empty){
         option(google.api.http) = {
-            delete: "/user/v1"
-
+            delete: "/user/v1/{id}"
         };
     }
 }
