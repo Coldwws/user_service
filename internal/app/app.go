@@ -2,17 +2,19 @@ package app
 
 import (
 	"context"
+	"crypto/x509"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/joho/godotenv"
 	"github.com/rakyll/statik/fs"
 	"github.com/rs/cors"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
 	"io"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 	"user_service/internal/closer"
@@ -117,8 +119,13 @@ func (a *App) Run() error {
 }
 
 func (a *App) initGRPCServer(ctx context.Context) error {
+	creds, err := credentials.NewServerTLSFromFile("cert/service.pem", "cert/service.key")
+	if err != nil {
+		return err
+	}
+
 	a.grpcServer = grpc.NewServer(
-		grpc.Creds(insecure.NewCredentials()),
+		grpc.Creds(creds),
 		grpc.UnaryInterceptor(interceptor.ValidateInterceptor),
 	)
 
@@ -135,7 +142,7 @@ func (a *App) initHttpServer(ctx context.Context) error {
 
 	corsMiddleware := cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Content-Type", "Content-Length", "Authorization"},
 		AllowCredentials: true,
 	})
@@ -146,8 +153,22 @@ func (a *App) initHttpServer(ctx context.Context) error {
 	}
 
 	go func() {
+		// читаем файл
+		caCert, err := os.ReadFile("cert/ca.crt")
+		if err != nil {
+			log.Fatal("Failed to read CA certificate:", err)
+		}
+
+		certPool := x509.NewCertPool()
+		if !certPool.AppendCertsFromPEM(caCert) {
+			log.Fatal("Failed to append CA certificate")
+		}
+
+		//tls for client
+		creds := credentials.NewClientTLSFromCert(certPool, "localhost")
+
 		opts := []grpc.DialOption{
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithTransportCredentials(creds),
 		}
 
 		grpcAddr := a.serviceProvider.config.GRPC.Addr()
@@ -206,7 +227,7 @@ func (a *App) runGRPCServer() error {
 func (a *App) runHTTPserver() error {
 	log.Printf("HTTP server is running on %s", a.serviceProvider.config.Http.Address())
 
-	err := a.httpServer.ListenAndServe()
+	err := a.httpServer.ListenAndServeTLS("cert/service.pem", "cert/service.key")
 	if err != nil {
 		return err
 	}
