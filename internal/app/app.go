@@ -5,8 +5,11 @@ import (
 	"crypto/x509"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/joho/godotenv"
+	"github.com/natefinch/lumberjack"
 	"github.com/rakyll/statik/fs"
 	"github.com/rs/cors"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
@@ -20,6 +23,7 @@ import (
 	"user_service/internal/closer"
 	"user_service/internal/config"
 	"user_service/internal/interceptor"
+	"user_service/internal/logger"
 	desc "user_service/pkg/user_v1"
 	_ "user_service/statik"
 )
@@ -30,10 +34,11 @@ type App struct {
 	grpcServer      *grpc.Server
 	httpServer      *http.Server
 	swaggerServer   *http.Server
+	logLevel        string
 }
 
-func NewApp(ctx context.Context) (*App, error) {
-	a := &App{}
+func NewApp(ctx context.Context, logLevel string) (*App, error) {
+	a := &App{logLevel: logLevel}
 
 	err := a.InitDeps(ctx)
 	if err != nil {
@@ -46,6 +51,7 @@ func NewApp(ctx context.Context) (*App, error) {
 func (a *App) InitDeps(ctx context.Context) error {
 	inits := []func(context.Context) error{
 		a.initConfig,
+		a.initLogger,
 		a.initServiceProvider,
 		a.initGRPCServer,
 		a.initHttpServer,
@@ -71,6 +77,47 @@ func (a *App) initConfig(_ context.Context) error {
 
 	return nil
 
+}
+
+func (a *App) initLogger(_ context.Context) error {
+	logger.Init(a.getCore(a.getAtomicLevel()))
+
+	return nil
+}
+
+func (a *App) getCore(level zap.AtomicLevel) zapcore.Core {
+	stdout := zapcore.AddSync(os.Stdout)
+
+	file := zapcore.AddSync(&lumberjack.Logger{
+		Filename:   "logs/app.log",
+		MaxSize:    10, // megabytes
+		MaxBackups: 3,
+		MaxAge:     7, // days
+	})
+
+	productionCfg := zap.NewProductionEncoderConfig()
+	productionCfg.TimeKey = "timestamp"
+	productionCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+
+	developmentCfg := zap.NewDevelopmentEncoderConfig()
+	developmentCfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+
+	consoleEncoder := zapcore.NewConsoleEncoder(developmentCfg)
+	fileEncoder := zapcore.NewJSONEncoder(productionCfg)
+
+	return zapcore.NewTee(
+		zapcore.NewCore(consoleEncoder, stdout, level),
+		zapcore.NewCore(fileEncoder, file, level),
+	)
+}
+
+func (a *App) getAtomicLevel() zap.AtomicLevel {
+	var level zapcore.Level
+	if err := level.Set(a.logLevel); err != nil {
+		log.Fatalf("failed to set log level: %w", err)
+	}
+
+	return zap.NewAtomicLevelAt(level)
 }
 
 func (a *App) initServiceProvider(_ context.Context) error {
@@ -120,13 +167,14 @@ func (a *App) Run() error {
 
 func (a *App) initGRPCServer(ctx context.Context) error {
 	creds, err := credentials.NewServerTLSFromFile("cert/service.pem", "cert/service.key")
+
 	if err != nil {
 		return err
 	}
 
 	a.grpcServer = grpc.NewServer(
 		grpc.Creds(creds),
-		grpc.UnaryInterceptor(interceptor.ValidateInterceptor),
+		grpc.ChainUnaryInterceptor(interceptor.ValidateInterceptor, interceptor.LogInInterceptor),
 	)
 
 	reflection.Register(a.grpcServer)

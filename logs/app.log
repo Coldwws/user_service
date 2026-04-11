@@ -1,0 +1,8 @@
+{"level":"info","timestamp":"2026-04-12T02:20:06.269+0500","msg":"Get User","UserID":2}
+{"level":"error","timestamp":"2026-04-12T02:20:06.287+0500","msg":"no rows in result set","method":"/user_v1.UserV1/Get","req":"id:2"}
+{"level":"info","timestamp":"2026-04-12T02:20:06.287+0500","msg":"request","method":"/user_v1.UserV1/Get","req":"id:2","res":"<nil>","duration":0.0186037}
+{"level":"info","timestamp":"2026-04-12T02:20:24.688+0500","msg":"Get User","UserID":10}
+{"level":"error","timestamp":"2026-04-12T02:20:24.690+0500","msg":"no rows in result set","method":"/user_v1.UserV1/Get","req":"id:10"}
+{"level":"info","timestamp":"2026-04-12T02:20:24.691+0500","msg":"request","method":"/user_v1.UserV1/Get","req":"id:10","res":"<nil>","duration":0.0029022}
+{"level":"info","timestamp":"2026-04-12T02:20:29.665+0500","msg":"Get User","UserID":13}
+{"level":"info","timestamp":"2026-04-12T02:20:29.668+0500","msg":"request","method":"/user_v1.UserV1/Get","req":"id:13","res":"user:{id:13  info:{first_name:\"anim veniam culpa Lorem\"  last_name:\"culpa Lorem\"  phone_number:\"ex in cupidatat dolor veniam\"  email:\"in\"}  created_at:{seconds:1775486479  nanos:456076000}  updated_at:{seconds:1775486479  nanos:455376000}}","duration":0.0025116}

@@ -3,14 +3,17 @@ package user
 import (
 	"context"
 	"database/sql"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"time"
 	"user_service/internal/converter"
+	"user_service/internal/logger"
 	"user_service/internal/model"
 	desc "user_service/pkg/user_v1"
 )
 
 func (s *Server) Create(ctx context.Context, req *desc.CreateRequest) (*desc.CreateResponse, error) {
+	logger.Info("Create user", zap.Any("UserInfo", req.GetInfo()))
 
 	userModel := converter.UserProtoToModel(&desc.User{
 		Info: &desc.UserInfo{
@@ -30,6 +33,8 @@ func (s *Server) Create(ctx context.Context, req *desc.CreateRequest) (*desc.Cre
 	return &desc.CreateResponse{Id: id}, nil
 }
 func (s *Server) Get(ctx context.Context, req *desc.GetRequest) (*desc.GetResponse, error) {
+	logger.Info("Get User", zap.Int64("UserID", req.Id))
+
 	userModel, err := s.userService.Get(ctx, req.Id)
 	if err != nil {
 		return nil, err

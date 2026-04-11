@@ -16,6 +16,7 @@ require (
 	github.com/rakyll/statik v0.1.8
 	github.com/rs/cors v1.11.1
 	github.com/stretchr/testify v1.11.1
+	go.uber.org/zap v1.27.1
 	google.golang.org/genproto/googleapis/api v0.0.0-20260209200024-4cfbd4190f57
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
@@ -34,8 +35,10 @@ require (
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/natefinch/lumberjack v2.0.0+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/crypto v0.47.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
