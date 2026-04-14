@@ -6,6 +6,7 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/joho/godotenv"
 	"github.com/natefinch/lumberjack"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rakyll/statik/fs"
 	"github.com/rs/cors"
 	"go.uber.org/zap"
@@ -24,6 +25,7 @@ import (
 	"user_service/internal/config"
 	"user_service/internal/interceptor"
 	"user_service/internal/logger"
+	"user_service/internal/metric"
 	desc "user_service/pkg/user_v1"
 	_ "user_service/statik"
 )
@@ -52,11 +54,11 @@ func (a *App) InitDeps(ctx context.Context) error {
 	inits := []func(context.Context) error{
 		a.initConfig,
 		a.initLogger,
+		a.initMetrics,
 		a.initServiceProvider,
 		a.initGRPCServer,
 		a.initHttpServer,
-		a.initSwaggerServer,
-	}
+		a.initSwaggerServer}
 	for _, f := range inits {
 		if err := f(ctx); err != nil {
 			return err
@@ -134,7 +136,7 @@ func (a *App) Run() error {
 		closer.Wait()
 	}()
 	wg := sync.WaitGroup{}
-	wg.Add(3)
+	wg.Add(4)
 
 	go func() {
 		defer wg.Done()
@@ -142,6 +144,15 @@ func (a *App) Run() error {
 		err := a.runGRPCServer()
 		if err != nil {
 			log.Printf("failed to run grpc server: %v", err)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+
+		err := runPrometheus()
+		if err != nil {
+			log.Printf("failed to run PROMETHEUS: %v", err)
 		}
 	}()
 
@@ -166,7 +177,7 @@ func (a *App) Run() error {
 }
 
 func (a *App) initGRPCServer(ctx context.Context) error {
-	creds, err := credentials.NewServerTLSFromFile("cert/service.pem", "cert/service.key")
+	creds, err := credentials.NewServerTLSFromFile("/cert/service.pem", "/cert/service.key")
 
 	if err != nil {
 		return err
@@ -174,7 +185,7 @@ func (a *App) initGRPCServer(ctx context.Context) error {
 
 	a.grpcServer = grpc.NewServer(
 		grpc.Creds(creds),
-		grpc.ChainUnaryInterceptor(interceptor.ValidateInterceptor, interceptor.LogInInterceptor),
+		grpc.ChainUnaryInterceptor(interceptor.ValidateInterceptor, interceptor.LogInInterceptor, interceptor.MetricsInterceptor),
 	)
 
 	reflection.Register(a.grpcServer)
@@ -184,7 +195,9 @@ func (a *App) initGRPCServer(ctx context.Context) error {
 	return nil
 
 }
-
+func (a *App) initMetrics(ctx context.Context) error {
+	return metric.Init(ctx)
+}
 func (a *App) initHttpServer(ctx context.Context) error {
 	mux := runtime.NewServeMux()
 
@@ -202,7 +215,7 @@ func (a *App) initHttpServer(ctx context.Context) error {
 
 	go func() {
 		// читаем файл
-		caCert, err := os.ReadFile("cert/ca.crt")
+		caCert, err := os.ReadFile("/cert/ca.crt")
 		if err != nil {
 			log.Fatal("Failed to read CA certificate:", err)
 		}
@@ -254,6 +267,22 @@ func (a *App) initSwaggerServer(_ context.Context) error {
 	return nil
 }
 
+func runPrometheus() error {
+	mux := http.NewServeMux()
+
+	mux.Handle("/metrics", promhttp.Handler())
+	prometheusServer := &http.Server{
+		Addr:    "0.0.0.0:2112",
+		Handler: mux,
+	}
+	logger.Info("Prometheus server running on :2112")
+	err := prometheusServer.ListenAndServe()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (a *App) runGRPCServer() error {
 
 	log.Println("GRPC server is running on:", a.serviceProvider.config.GRPC.Addr())
@@ -274,8 +303,8 @@ func (a *App) runGRPCServer() error {
 
 func (a *App) runHTTPserver() error {
 	log.Printf("HTTP server is running on %s", a.serviceProvider.config.Http.Address())
-
-	err := a.httpServer.ListenAndServeTLS("cert/service.pem", "cert/service.key")
+	err := a.httpServer.ListenAndServeTLS("/cert/service.pem", "/cert/service.key")
+	//err := a.httpServer.ListenAndServe()
 	if err != nil {
 		return err
 	}

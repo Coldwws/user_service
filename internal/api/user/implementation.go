@@ -3,8 +3,10 @@ package user
 import (
 	"context"
 	"database/sql"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"math/rand"
 	"time"
 	"user_service/internal/converter"
 	"user_service/internal/logger"
@@ -34,6 +36,11 @@ func (s *Server) Create(ctx context.Context, req *desc.CreateRequest) (*desc.Cre
 }
 func (s *Server) Get(ctx context.Context, req *desc.GetRequest) (*desc.GetResponse, error) {
 	logger.Info("Get User", zap.Int64("UserID", req.Id))
+
+	if req.GetId() == 0 {
+		return nil, errors.Errorf("id is empty")
+	}
+	time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
 
 	userModel, err := s.userService.Get(ctx, req.Id)
 	if err != nil {

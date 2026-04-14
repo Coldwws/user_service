@@ -2,6 +2,7 @@ version: "3.9"
 
 volumes:
   postgres_volume_local:
+  prometheus_data:
 
 services:
   pg_local:
@@ -39,3 +40,16 @@ services:
     ports:
       - "50051:50051"
       - "8081:8081"
+      - "8090:8090"
+      - "2112:2112"
+    volumes:
+      - ./cert:/cert
+
+  prometheus:
+    image: prom/prometheus:v2.37.9
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./alerts.yml:/etc/prometheus/alerts.yml
+      - prometheus_data:/prometheus
