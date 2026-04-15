@@ -3,6 +3,7 @@ version: "3.9"
 volumes:
   postgres_volume_local:
   prometheus_data:
+  grafana_data:
 
 services:
   pg_local:
@@ -53,3 +54,10 @@ services:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
       - ./alerts.yml:/etc/prometheus/alerts.yml
       - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana-oss:10.0.3
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana

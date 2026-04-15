@@ -12,8 +12,9 @@ const (
 )
 
 type Metrics struct {
-	requestCounter  prometheus.Counter
-	responseCounter *prometheus.CounterVec
+	requestCounter        prometheus.Counter
+	responseCounter       *prometheus.CounterVec
+	histogramResponseTime *prometheus.HistogramVec
 }
 
 var metrics *Metrics
@@ -37,6 +38,16 @@ func Init(_ context.Context) error {
 			},
 			[]string{"status", "method"},
 		),
+		histogramResponseTime: promauto.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Namespace: namespace,
+				Subsystem: "grpc",
+				Name:      app_name + "_histgoram_response_time_seconds",
+				Help:      "Время ответа от сервера",
+				Buckets:   prometheus.ExponentialBuckets(0.0001, 2, 16),
+			},
+			[]string{"status"},
+		),
 	}
 	return nil
 }
@@ -44,6 +55,11 @@ func Init(_ context.Context) error {
 func IncRequestCounter() {
 	metrics.requestCounter.Inc()
 }
+
 func IncResponseCounter(status, method string) {
 	metrics.responseCounter.WithLabelValues(status, method).Inc()
+}
+
+func HistogramResponseTimeObserve(status string, time float64) {
+	metrics.histogramResponseTime.WithLabelValues(status).Observe(time)
 }
