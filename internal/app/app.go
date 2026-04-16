@@ -26,8 +26,13 @@ import (
 	"user_service/internal/interceptor"
 	"user_service/internal/logger"
 	"user_service/internal/metric"
+	"user_service/internal/tracing"
 	desc "user_service/pkg/user_v1"
 	_ "user_service/statik"
+)
+
+var (
+	serviceName = "user_service"
 )
 
 type App struct {
@@ -58,7 +63,9 @@ func (a *App) InitDeps(ctx context.Context) error {
 		a.initServiceProvider,
 		a.initGRPCServer,
 		a.initHttpServer,
-		a.initSwaggerServer}
+		a.initSwaggerServer,
+		a.initTracing,
+	}
 	for _, f := range inits {
 		if err := f(ctx); err != nil {
 			return err
@@ -130,6 +137,11 @@ func (a *App) initServiceProvider(_ context.Context) error {
 
 }
 
+func (a *App) initTracing(_ context.Context) error {
+	tracing.Init(logger.Logger(), serviceName)
+	return nil
+}
+
 func (a *App) Run() error {
 	defer func() {
 		closer.CloseAll()
@@ -176,7 +188,7 @@ func (a *App) Run() error {
 	return nil
 }
 
-func (a *App) initGRPCServer(ctx context.Context) error {
+func (a *App) initGRPCServer(_ context.Context) error {
 	creds, err := credentials.NewServerTLSFromFile("/cert/service.pem", "/cert/service.key")
 
 	if err != nil {
@@ -185,7 +197,11 @@ func (a *App) initGRPCServer(ctx context.Context) error {
 
 	a.grpcServer = grpc.NewServer(
 		grpc.Creds(creds),
-		grpc.ChainUnaryInterceptor(interceptor.ValidateInterceptor, interceptor.LogInInterceptor, interceptor.MetricsInterceptor),
+		grpc.ChainUnaryInterceptor(interceptor.ValidateInterceptor,
+			interceptor.LogInInterceptor,
+			interceptor.MetricsInterceptor,
+			interceptor.ServerTracingInterceptor,
+		),
 	)
 
 	reflection.Register(a.grpcServer)

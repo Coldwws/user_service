@@ -30,3 +30,6 @@ func Fatal(msg string, fields ...zap.Field) {
 func WithOptions(opts ...zap.Option) *zap.Logger {
 	return globalLogger.WithOptions(opts...)
 }
+func Logger() *zap.Logger {
+	return globalLogger
+}
