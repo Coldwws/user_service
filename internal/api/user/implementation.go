@@ -3,15 +3,17 @@ package user
 import (
 	"context"
 	"database/sql"
-	"github.com/pkg/errors"
-	"go.uber.org/zap"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"math/rand"
 	"time"
 	"user_service/internal/converter"
 	"user_service/internal/logger"
 	"user_service/internal/model"
 	desc "user_service/pkg/user_v1"
+
+	"github.com/opentracing/opentracing-go"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func (s *Server) Create(ctx context.Context, req *desc.CreateRequest) (*desc.CreateResponse, error) {
@@ -40,6 +42,10 @@ func (s *Server) Get(ctx context.Context, req *desc.GetRequest) (*desc.GetRespon
 	if req.GetId() == 0 {
 		return nil, errors.Errorf("id is empty")
 	}
+
+	span, ctx := opentracing.StartSpanFromContext(ctx, "GetUser")
+	defer span.Finish()
+
 	time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
 
 	userModel, err := s.userService.Get(ctx, req.Id)
@@ -61,10 +67,15 @@ func (s *Server) Delete(ctx context.Context, req *desc.DeleteRequest) (*emptypb.
 }
 
 func (s *Server) List(ctx context.Context, req *desc.ListRequest) (*desc.ListResponse, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "GetUserList")
+	defer span.Finish()
+
 	userList, err := s.userService.List(ctx, req.Limit, req.Offset)
+
 	if err != nil {
 		return &desc.ListResponse{}, err
 	}
+
 	protoUsers := make([]*desc.User, 0, len(userList))
 	for _, u := range userList {
 		protoUsers = append(protoUsers, converter.UserModelToProto(u))

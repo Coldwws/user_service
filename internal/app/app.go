@@ -3,17 +3,6 @@ package app
 import (
 	"context"
 	"crypto/x509"
-	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"github.com/joho/godotenv"
-	"github.com/natefinch/lumberjack"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/rakyll/statik/fs"
-	"github.com/rs/cors"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/reflection"
 	"io"
 	"log"
 	"net"
@@ -26,9 +15,23 @@ import (
 	"user_service/internal/interceptor"
 	"user_service/internal/logger"
 	"user_service/internal/metric"
+	"user_service/internal/rate_limiter"
 	"user_service/internal/tracing"
 	desc "user_service/pkg/user_v1"
 	_ "user_service/statik"
+
+	grpcMiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/joho/godotenv"
+	"github.com/natefinch/lumberjack"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rakyll/statik/fs"
+	"github.com/rs/cors"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/reflection"
 )
 
 var (
@@ -59,12 +62,12 @@ func (a *App) InitDeps(ctx context.Context) error {
 	inits := []func(context.Context) error{
 		a.initConfig,
 		a.initLogger,
+		a.initTracing,
 		a.initMetrics,
 		a.initServiceProvider,
 		a.initGRPCServer,
 		a.initHttpServer,
 		a.initSwaggerServer,
-		a.initTracing,
 	}
 	for _, f := range inits {
 		if err := f(ctx); err != nil {
@@ -123,7 +126,7 @@ func (a *App) getCore(level zap.AtomicLevel) zapcore.Core {
 func (a *App) getAtomicLevel() zap.AtomicLevel {
 	var level zapcore.Level
 	if err := level.Set(a.logLevel); err != nil {
-		log.Fatalf("failed to set log level: %w", err)
+		logger.Error("failed to set log level: ", zap.Error(err))
 	}
 
 	return zap.NewAtomicLevelAt(level)
@@ -195,12 +198,18 @@ func (a *App) initGRPCServer(_ context.Context) error {
 		return err
 	}
 
+	rateLimiter := rate_limiter.NewTokenBucketLimiter(ctx, 10, time.Second)
+
 	a.grpcServer = grpc.NewServer(
 		grpc.Creds(creds),
-		grpc.ChainUnaryInterceptor(interceptor.ValidateInterceptor,
-			interceptor.LogInInterceptor,
-			interceptor.MetricsInterceptor,
-			interceptor.ServerTracingInterceptor,
+		grpc.UnaryInterceptor(
+			grpcMiddleware.ChainUnaryServer(
+				interceptor.NewRateLimiterInterceptor(rateLimiter).Unary,
+				interceptor.ValidateInterceptor,
+				interceptor.LogInInterceptor,
+				interceptor.MetricsInterceptor,
+				interceptor.ServerTracingInterceptor,
+			),
 		),
 	)
 

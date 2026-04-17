@@ -12,7 +12,7 @@ func Init(logger *zap.Logger, serviceName string) {
 			Param: 1,
 		},
 		Reporter: &config.ReporterConfig{
-			LocalAgentHostPort: "jaeger:6832",
+			LocalAgentHostPort: "jaeger:6831",
 		},
 	}
 	_, err := cfg.InitGlobalTracer(serviceName)
