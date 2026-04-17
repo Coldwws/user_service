@@ -1,10 +1,11 @@
 package interceptor
 
 import (
-	"go.uber.org/zap"
-	"google.golang.org/grpc"
 	"time"
 	"user_service/internal/logger"
+
+	"go.uber.org/zap"
+	"google.golang.org/grpc"
 )
 import "context"
 

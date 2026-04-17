@@ -11,8 +11,9 @@ import (
 	desc "user_service/pkg/user_v1"
 
 	"github.com/opentracing/opentracing-go"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -37,10 +38,10 @@ func (s *Server) Create(ctx context.Context, req *desc.CreateRequest) (*desc.Cre
 	return &desc.CreateResponse{Id: id}, nil
 }
 func (s *Server) Get(ctx context.Context, req *desc.GetRequest) (*desc.GetResponse, error) {
-	logger.Info("Get User", zap.Int64("UserID", req.Id))
+	//logger.Info("Get User", zap.Int64("UserID", req.Id))
 
 	if req.GetId() == 0 {
-		return nil, errors.Errorf("id is empty")
+		return nil, status.Error(codes.Internal, "id is empty")
 	}
 
 	span, ctx := opentracing.StartSpanFromContext(ctx, "GetUser")

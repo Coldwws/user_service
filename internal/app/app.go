@@ -27,6 +27,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rakyll/statik/fs"
 	"github.com/rs/cors"
+	"github.com/sony/gobreaker"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
@@ -198,15 +199,29 @@ func (a *App) initGRPCServer(_ context.Context) error {
 		return err
 	}
 
+	cb := gobreaker.NewCircuitBreaker(gobreaker.Settings{
+		Name:        "my_user_service",
+		MaxRequests: 4,
+		Timeout:     time.Second * 5,
+		ReadyToTrip: func(counts gobreaker.Counts) bool {
+			failureRatio := float64(counts.TotalFailures) / float64(counts.Requests)
+			return failureRatio >= 0.6
+		},
+		OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
+			logger.Info("Circuit Breaker changed", zap.Any("From", from), zap.Any("To", to), zap.String("name", name))
+		},
+	})
+
 	rateLimiter := rate_limiter.NewTokenBucketLimiter(ctx, 10, time.Second)
 
 	a.grpcServer = grpc.NewServer(
 		grpc.Creds(creds),
 		grpc.UnaryInterceptor(
 			grpcMiddleware.ChainUnaryServer(
+				interceptor.LogInInterceptor, // ← ВАЖНО: первый
+				interceptor.NewCircuitBreaker(cb).Unary,
 				interceptor.NewRateLimiterInterceptor(rateLimiter).Unary,
 				interceptor.ValidateInterceptor,
-				interceptor.LogInInterceptor,
 				interceptor.MetricsInterceptor,
 				interceptor.ServerTracingInterceptor,
 			),
@@ -220,6 +235,7 @@ func (a *App) initGRPCServer(_ context.Context) error {
 	return nil
 
 }
+
 func (a *App) initMetrics(ctx context.Context) error {
 	return metric.Init(ctx)
 }
